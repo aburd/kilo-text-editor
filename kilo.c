@@ -121,7 +121,10 @@ void editorProcessKeypress() {
 void editorDrawRows() {
   for (int y = 0; y < E.screenrows; y++)
   {
-    write(STDOUT_FILENO, "~\r\n", 3);
+    write(STDOUT_FILENO, "~", 3);
+    if (y < E.screenrows - 1) {
+      write(STDOUT_FILENO, "\r\n", 2);
+    }
   }
 }
 
@@ -132,6 +135,15 @@ void editorRefreshScreen() {
   editorDrawRows();
   write(STDOUT_FILENO, "\x1b[H", 3);
 }
+
+/*** append buffer ***/
+
+struct abuf {
+  char *c;
+  int len;
+};
+
+#define ABUF_INIT {NULL, 0}
 
 /*** init ***/
 
