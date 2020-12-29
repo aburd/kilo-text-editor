@@ -113,15 +113,16 @@ void initEditor() {
 void editorMoveCursor(char key) {
   switch (key) {
     case 'w':
-      E.cy--;
+      if (E.cy > 0) E.cy--;
       break;
     case 'a':
-      E.cx--;
+      if (E.cx > 0) E.cx--;
+      break;
     case 'd':
-      E.cx++;
+      if (E.cx < E.screencols) E.cx++;
       break;
     case 's':
-      E.cy++;
+      if (E.cy < E.screenrows) E.cy++;
       break;
   }
 }
@@ -170,6 +171,9 @@ void abFree(struct abuf *ab) {
 
 void editorDrawRows(struct abuf *ab) {
   for (int y = 0; y < E.screenrows; y++) {
+    abAppend(ab, "~", 1);
+
+    // Write the title
     if (y == E.screenrows / 3) {
       char welcome[80];
       int welcomelen = snprintf(welcome, sizeof(welcome), 
@@ -177,18 +181,29 @@ void editorDrawRows(struct abuf *ab) {
       if (welcomelen > E.screencols) welcomelen = E.screencols;
 
       int padding = (E.screencols - welcomelen) / 2;
-      if (padding) {
-        abAppend(ab, "~", 1);
-        padding -= 1;
-      }
+      if (padding) padding -= 1;
       while (padding--) abAppend(ab, " ", 1);
 
       abAppend(ab, welcome, welcomelen);
-    } else {
-      abAppend(ab, "~", 1);
+    }
+    // Write debug
+    if (y == E.screenrows / 3 + 1) {
+      char debug[80];
+      int debuglen = snprintf(debug, sizeof(debug), 
+        "~ cx: %d, cy: %d", E.cx, E.cy);
+      if (debuglen > E.screencols) debuglen = E.screencols;
+
+      int padding = (E.screencols - debuglen) / 2;
+      if (padding) padding -= 1;
+      while (padding--) abAppend(ab, " ", 1);
+
+      abAppend(ab, debug, debuglen);
     }
     
+    // clear any text after the buffer
     abAppend(ab, "\x1b[K", 3);
+
+    // Only add last line break if it isn't the last line
     if (y < E.screenrows - 1) {
       abAppend(ab, "\r\n", 2);
     }
@@ -200,12 +215,13 @@ void editorRefreshScreen() {
 
   // Hide cursor
   abAppend(&ab, "\x1b[?25l", 6);
+    abAppend(&ab, "\x1b[H", 3);
 
   editorDrawRows(&ab);
 
   // Set position of cursor
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 3);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
   abAppend(&ab, buf, strlen(buf));
 
   // Show cursor
