@@ -17,6 +17,7 @@
 /*** data ***/
 
 struct editorConfig {
+  int cx, cy;
   int screenrows;
   int screencols;
   struct termios orig_termios;
@@ -99,12 +100,31 @@ int getWindowSize(int *rows, int *cols) {
 }
 
 void initEditor() {
+  E.cx = 0;
+  E.cy = 0;
+
   if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     die("getWindowSize");
 }
 
 
 /*** input ***/
+
+void editorMoveCursor(char key) {
+  switch (key) {
+    case 'w':
+      E.cy--;
+      break;
+    case 'a':
+      E.cx--;
+    case 'd':
+      E.cx++;
+      break;
+    case 's':
+      E.cy++;
+      break;
+  }
+}
 
 void editorProcessKeypress() {
   char c = editorReadKey();
@@ -114,6 +134,12 @@ void editorProcessKeypress() {
       write(STDOUT_FILENO, "\x1b[2J", 4);
       write(STDOUT_FILENO, "\x1b[H", 3);
       exit(0);
+      break;
+    case 'w':
+    case 'a':
+    case 'd':
+    case 's':
+      editorMoveCursor(c);
       break;
   }
 }
@@ -174,13 +200,14 @@ void editorRefreshScreen() {
 
   // Hide cursor
   abAppend(&ab, "\x1b[?25l", 6);
-  // Reposition cursor at the top
-  abAppend(&ab, "\x1b[H", 3);
 
   editorDrawRows(&ab);
 
-  // Reposition cursor at the top
-  abAppend(&ab, "\x1b[H", 3);
+  // Set position of cursor
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 3);
+  abAppend(&ab, buf, strlen(buf));
+
   // Show cursor
   abAppend(&ab, "\x1b[?25h", 6);
 
