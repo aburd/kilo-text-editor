@@ -15,10 +15,12 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 enum editorKey {
-  ARROW_UP = 'w',
-  ARROW_DOWN = 's',
-  ARROW_LEFT = 'a',
-  ARROW_RIGHT = 'd',
+  ARROW_UP = 1000,
+  ARROW_DOWN,
+  ARROW_LEFT,
+  ARROW_RIGHT,
+  PAGE_UP,
+  PAGE_DOWN,
 };
 
 /*** data ***/
@@ -63,7 +65,7 @@ void enableRawMode() {
   if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
 }
 
-char editorReadKey() {
+int editorReadKey() {
   int nread;
   char c;
   while ((nread = read(STDIN_FILENO, &c, 1)) != 1) {
@@ -77,11 +79,21 @@ char editorReadKey() {
     if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
 
     if (seq[0] == '[') {
-      switch (seq[1]) {
-        case 'A': return ARROW_UP;
-        case 'B': return ARROW_DOWN;
-        case 'C': return ARROW_RIGHT;
-        case 'D': return ARROW_LEFT;
+      if (seq[1] >= '0' && seq[1] <= '9') {
+        if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+        if (seq[2] == '~') {
+          switch(seq[1]) {
+            case '5': return PAGE_UP;
+            case '6': return PAGE_DOWN;
+          }
+        }
+      } else {
+        switch (seq[1]) {
+          case 'A': return ARROW_UP;
+          case 'B': return ARROW_DOWN;
+          case 'C': return ARROW_RIGHT;
+          case 'D': return ARROW_LEFT;
+        }
       }
     }
 
@@ -136,7 +148,7 @@ void initEditor() {
 
 /*** input ***/
 
-void editorMoveCursor(char key) {
+void editorMoveCursor(int key) {
   switch (key) {
     case ARROW_UP:
       if (E.cy > 0) E.cy--;
@@ -150,11 +162,18 @@ void editorMoveCursor(char key) {
     case ARROW_DOWN:
       if (E.cy < E.screenrows) E.cy++;
       break;
+    case PAGE_DOWN:
+    case PAGE_UP:
+      int times = E.screencols;
+      while(times--) {
+        editorMoveCursor(key == PAGE_DOWN ? ARROW_DOWN : ARROW_UP);
+      }
+      break;
   }
 }
 
 void editorProcessKeypress() {
-  char c = editorReadKey();
+  int c = editorReadKey();
   switch (c)
   {
     case CTRL_KEY('c'):
@@ -166,6 +185,8 @@ void editorProcessKeypress() {
     case ARROW_DOWN:
     case ARROW_LEFT:
     case ARROW_RIGHT:
+    case PAGE_UP:
+    case PAGE_DOWN:
       editorMoveCursor(c);
       break;
   }
