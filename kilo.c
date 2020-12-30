@@ -1,4 +1,7 @@
 /*** includes ***/
+#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <ctype.h>
 #include <errno.h>
@@ -308,8 +311,11 @@ void editorDrawRows(struct abuf *ab) {
     abAppend(ab, "~", 1);
 
     if (y >= E.numrows) {
-      if (y == E.screenrows / 3) drawTitle(ab);
-      if (y == E.screenrows / 3 + 1) drawDebug(ab);
+      // no file is opened
+      if (E.numrows == 0) {
+        if (y == E.screenrows / 3) drawTitle(ab);
+        if (y == E.screenrows / 3 + 1) drawDebug(ab);
+      }
     } else {
       int len = E.row.size;
       if (len > E.screencols) len = E.screencols;
