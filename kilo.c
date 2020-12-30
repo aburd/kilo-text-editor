@@ -217,18 +217,34 @@ void editorOpen(char *filename) {
 /*** input ***/
 
 void editorMoveCursor(int key) {
+  erow *row = (E.cy > E.numrows) ? NULL : &E.row[E.cy];
   switch (key) {
     case ARROW_UP:
       if (E.cy > 0) E.cy--;
       break;
     case ARROW_LEFT:
-      if (E.cx > 0) E.cx--;
+      if (E.cx > 0) {
+        E.cx--;
+      } else if (E.cx == 0 && E.cy > 0) {
+        E.cy--;
+        erow *row = &E.row[E.cy];
+        E.cx = row->size;
+      }
       break;
     case ARROW_RIGHT:
-      E.cx++;
+      if (row) {
+        if (E.cx < row->size) {
+          E.cx++;
+        } else if (E.cx == row->size) {
+          if (E.cy != 0) {
+            E.cy++;
+            E.cx = 0;
+          }
+        }
+      }
       break;
     case ARROW_DOWN:
-      if (E.cy < E.numrows) E.cy++;
+      if (E.cy <= E.numrows) E.cy++;
       break;
     case PAGE_DOWN:
     case PAGE_UP:
@@ -243,7 +259,7 @@ void editorMoveCursor(int key) {
       E.cx = 0;
       break;
     case END_KEY:
-      E.cx = E.screencols;
+      E.cx = row->size;
       break;
   }
 }
