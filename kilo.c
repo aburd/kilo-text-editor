@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <string.h>
 
 
@@ -28,11 +29,18 @@ enum editorKey {
 
 /*** data ***/
 
+typedef struct erow {
+  int size;
+  char *chars;
+} erow;
+
 struct editorConfig {
   int cx, cy;
   int screenrows;
   int screencols;
   struct termios orig_termios;
+  int numrows;
+  erow row;
 };
 
 struct editorConfig E;
@@ -154,11 +162,26 @@ int getWindowSize(int *rows, int *cols) {
 }
 
 void initEditor() {
+  E.numrows = 0;
   E.cx = 0;
   E.cy = 0;
 
   if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     die("getWindowSize");
+}
+
+
+/*** file i/o ***/
+
+void editorOpen() {
+  char *line = "Hello, world!";
+  ssize_t linelen = 13;
+
+  E.row.size = linelen;
+  E.row.chars = malloc(linelen + 1);
+  memcpy(E.row.chars, line, linelen);
+  E.row.chars[linelen] = '\0';
+  E.numrows = 1;
 }
 
 
@@ -242,35 +265,43 @@ void abFree(struct abuf *ab) {
 
 /*** output ***/
 
+void drawTitle(struct abuf *ab) {
+  char welcome[80];
+  int welcomelen = snprintf(welcome, sizeof(welcome), 
+    "~ Kilo Editor -- Version %s", KILO_VERSION);
+  if (welcomelen > E.screencols) welcomelen = E.screencols;
+
+  int padding = (E.screencols - welcomelen) / 2;
+  if (padding) padding -= 1;
+  while (padding--) abAppend(ab, " ", 1);
+
+  abAppend(ab, welcome, welcomelen);
+}
+
+void drawDebug(struct abuf *ab) {
+  char debug[80];
+  int debuglen = snprintf(debug, sizeof(debug), 
+    "~ cx: %d, cy: %d", E.cx, E.cy);
+  if (debuglen > E.screencols) debuglen = E.screencols;
+
+  int padding = (E.screencols - debuglen) / 2;
+  if (padding) padding -= 1;
+  while (padding--) abAppend(ab, " ", 1);
+
+  abAppend(ab, debug, debuglen);
+}
+
 void editorDrawRows(struct abuf *ab) {
   for (int y = 0; y < E.screenrows; y++) {
     abAppend(ab, "~", 1);
 
-    // Write the title
-    if (y == E.screenrows / 3) {
-      char welcome[80];
-      int welcomelen = snprintf(welcome, sizeof(welcome), 
-        "~ Kilo Editor -- Version %s", KILO_VERSION);
-      if (welcomelen > E.screencols) welcomelen = E.screencols;
-
-      int padding = (E.screencols - welcomelen) / 2;
-      if (padding) padding -= 1;
-      while (padding--) abAppend(ab, " ", 1);
-
-      abAppend(ab, welcome, welcomelen);
-    }
-    // Write debug
-    if (y == E.screenrows / 3 + 1) {
-      char debug[80];
-      int debuglen = snprintf(debug, sizeof(debug), 
-        "~ cx: %d, cy: %d", E.cx, E.cy);
-      if (debuglen > E.screencols) debuglen = E.screencols;
-
-      int padding = (E.screencols - debuglen) / 2;
-      if (padding) padding -= 1;
-      while (padding--) abAppend(ab, " ", 1);
-
-      abAppend(ab, debug, debuglen);
+    if (y >= E.numrows) {
+      if (y == E.screenrows / 3) drawTitle(ab);
+      if (y == E.screenrows / 3 + 1) drawDebug(ab);
+    } else {
+      int len = E.row.size;
+      if (len > E.screencols) len = E.screencols;
+      abAppend(ab, E.row.chars, len);
     }
     
     // clear any text after the buffer
@@ -309,6 +340,7 @@ void editorRefreshScreen() {
 int main() {
   enableRawMode();
   initEditor();
+  editorOpen();
 
   while (1) {
     editorRefreshScreen();
