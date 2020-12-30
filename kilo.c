@@ -43,6 +43,7 @@ struct editorConfig {
   int screencols;
   struct termios orig_termios;
   int rowoff;
+  int coloff;
   int numrows;
   erow *row;
 };
@@ -171,6 +172,7 @@ void initEditor() {
   E.cy = 0;
   E.row = NULL;
   E.rowoff = 0;
+  E.coloff = 0;
 
   if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     die("getWindowSize");
@@ -223,7 +225,7 @@ void editorMoveCursor(int key) {
       if (E.cx > 0) E.cx--;
       break;
     case ARROW_RIGHT:
-      if (E.cx < (E.screencols - 1)) E.cx++;
+      E.cx++;
       break;
     case ARROW_DOWN:
       if (E.cy < E.numrows) E.cy++;
@@ -299,6 +301,12 @@ void editorScroll() {
   if (E.cy >= E.rowoff + E.screenrows) {
     E.rowoff = E.cy - E.screenrows + 1;
   }
+  if (E.cx < E.coloff) {
+    E.coloff = E.cx;
+  }
+  if (E.cx >= E.coloff + E.screencols) {
+    E.coloff = E.cx - E.screencols + 1;
+  }
 }
 
 void drawTitle(struct abuf *ab) {
@@ -339,9 +347,10 @@ void editorDrawRows(struct abuf *ab) {
         if (y == E.screenrows / 3 + 1) drawDebug(ab);
       }
     } else {
-      int len = E.row[filerow].size;
+      int len = E.row[filerow].size - E.coloff;
+      if (len < 0) len = 0;
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, E.row[filerow].chars, len);
+      abAppend(ab, &E.row[filerow].chars[E.coloff], len);
     }
     
     // clear any text after the buffer
@@ -365,7 +374,7 @@ void editorRefreshScreen() {
 
   // Set position of cursor
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.cx - E.coloff) + 1);
   abAppend(&ab, buf, strlen(buf));
 
   // Show cursor
