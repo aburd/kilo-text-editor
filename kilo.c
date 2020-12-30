@@ -42,6 +42,7 @@ struct editorConfig {
   int screenrows;
   int screencols;
   struct termios orig_termios;
+  int rowoff;
   int numrows;
   erow *row;
 };
@@ -169,6 +170,7 @@ void initEditor() {
   E.cx = 0;
   E.cy = 0;
   E.row = NULL;
+  E.rowoff = 0;
 
   if (getWindowSize(&E.screenrows, &E.screencols) == -1)
     die("getWindowSize");
@@ -221,10 +223,10 @@ void editorMoveCursor(int key) {
       if (E.cx > 0) E.cx--;
       break;
     case ARROW_RIGHT:
-      if (E.cx < E.screencols) E.cx++;
+      if (E.cx < (E.screencols - 1)) E.cx++;
       break;
     case ARROW_DOWN:
-      if (E.cy < E.screenrows) E.cy++;
+      if (E.cy < E.numrows) E.cy++;
       break;
     case PAGE_DOWN:
     case PAGE_UP:
@@ -290,6 +292,15 @@ void abFree(struct abuf *ab) {
 
 /*** output ***/
 
+void editorScroll() {
+  if (E.cy < E.rowoff) {
+    E.rowoff = E.cy;
+  }
+  if (E.cy >= E.rowoff + E.screenrows) {
+    E.rowoff = E.cy - E.screenrows + 1;
+  }
+}
+
 void drawTitle(struct abuf *ab) {
   char welcome[80];
   int welcomelen = snprintf(welcome, sizeof(welcome), 
@@ -320,16 +331,17 @@ void editorDrawRows(struct abuf *ab) {
   for (int y = 0; y < E.screenrows; y++) {
     abAppend(ab, "~", 1);
 
-    if (y >= E.numrows) {
+    int filerow = y + E.rowoff;
+    if (filerow >= E.numrows) {
       // no file is opened
       if (E.numrows == 0) {
         if (y == E.screenrows / 3) drawTitle(ab);
         if (y == E.screenrows / 3 + 1) drawDebug(ab);
       }
     } else {
-      int len = E.row[y].size;
+      int len = E.row[filerow].size;
       if (len > E.screencols) len = E.screencols;
-      abAppend(ab, E.row[y].chars, len);
+      abAppend(ab, E.row[filerow].chars, len);
     }
     
     // clear any text after the buffer
@@ -353,7 +365,7 @@ void editorRefreshScreen() {
 
   // Set position of cursor
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, E.cx + 1);
   abAppend(&ab, buf, strlen(buf));
 
   // Show cursor
@@ -374,6 +386,7 @@ int main(int argc, char *argv[]) {
   }
 
   while (1) {
+    editorScroll();
     editorRefreshScreen();
     editorProcessKeypress();
   }
