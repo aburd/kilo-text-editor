@@ -138,16 +138,16 @@ void initEditor() {
 
 void editorMoveCursor(char key) {
   switch (key) {
-    case 'w':
+    case ARROW_UP:
       if (E.cy > 0) E.cy--;
       break;
-    case 'a':
+    case ARROW_LEFT:
       if (E.cx > 0) E.cx--;
       break;
-    case 'd':
+    case ARROW_RIGHT:
       if (E.cx < E.screencols) E.cx++;
       break;
-    case 's':
+    case ARROW_DOWN:
       if (E.cy < E.screenrows) E.cy++;
       break;
   }
@@ -162,10 +162,10 @@ void editorProcessKeypress() {
       write(STDOUT_FILENO, "\x1b[H", 3);
       exit(0);
       break;
-    case 'w':
-    case 'a':
-    case 'd':
-    case 's':
+    case ARROW_UP:
+    case ARROW_DOWN:
+    case ARROW_LEFT:
+    case ARROW_RIGHT:
       editorMoveCursor(c);
       break;
   }
