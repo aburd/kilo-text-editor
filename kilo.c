@@ -37,13 +37,16 @@ typedef struct erow
 {
   int size;
   int rsize;
+  int marginlsize;
   char *chars;
   char *render;
+  char *marginl;
 } erow;
 
 struct editorConfig
 {
   int cx, cy;
+  int rx;
   int screenrows;
   int screencols;
   struct termios orig_termios;
@@ -222,6 +225,7 @@ void initEditor()
   E.numrows = 0;
   E.cx = 0;
   E.cy = 0;
+  E.rx = 0;
   E.row = NULL;
   E.rowoff = 0;
   E.coloff = 0;
@@ -232,6 +236,22 @@ void initEditor()
 
 /*** row operations ***/
 
+int cxToRx(erow *row, int cx)
+{
+  int rx = 0;
+  int j;
+  for (j = 0; j < cx; j++)
+  {
+    if (row->chars[j] == '\t')
+    {
+      rx += (KILO_TAB_STOP - 1) - (rx % KILO_TAB_STOP);
+    }
+    rx++;
+  }
+
+  return rx;
+}
+
 void editorUpdateRow(erow *row)
 {
   // calculate how many tabs are in the row
@@ -241,10 +261,18 @@ void editorUpdateRow(erow *row)
     if (row->chars[j] == '\t')
       tabs++;
 
+  // allocate mem
   free(row->render);
-  row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1);
+  row->render = malloc(row->size + tabs * (KILO_TAB_STOP - 1) + 1 + row->marginlsize);
 
+  // render margin
   int idx = 0;
+  for (j = 0; j < row->marginlsize; j++)
+  {
+    row->render[idx++] = row->marginl[j];
+  }
+
+  // render chars
   for (j = 0; j < row->size; j++)
   {
     if (row->chars[j] == '\t')
@@ -272,6 +300,9 @@ void editorAppendRow(char *s, size_t len)
   E.row[at].chars = malloc(len + 1);
   memcpy(E.row[at].chars, s, len);
   E.row[at].chars[len] = '\0';
+
+  E.row[at].marginl = "~ ";
+  E.row[at].marginlsize = 2;
 
   E.row[at].rsize = 0;
   E.row[at].render = NULL;
@@ -425,6 +456,12 @@ void abFree(struct abuf *ab)
 
 void editorScroll()
 {
+  E.rx = 0;
+  if (E.cy < E.numrows)
+  {
+    E.rx = cxToRx(&E.row[E.cy], E.cx);
+  }
+
   if (E.cy < E.rowoff)
   {
     E.rowoff = E.cy;
@@ -433,13 +470,13 @@ void editorScroll()
   {
     E.rowoff = E.cy - E.screenrows + 1;
   }
-  if (E.cx < E.coloff)
+  if (E.rx < E.coloff)
   {
-    E.coloff = E.cx;
+    E.coloff = E.rx;
   }
-  if (E.cx >= E.coloff + E.screencols)
+  if (E.rx >= E.coloff + E.screencols)
   {
-    E.coloff = E.cx - E.screencols + 1;
+    E.coloff = E.rx - E.screencols + 1;
   }
 }
 
@@ -481,8 +518,6 @@ void editorDrawRows(struct abuf *ab)
 {
   for (int y = 0; y < E.screenrows; y++)
   {
-    abAppend(ab, "~", 1);
-
     int filerow = y + E.rowoff;
     if (filerow >= E.numrows)
     {
@@ -528,7 +563,7 @@ void editorRefreshScreen()
 
   // Set position of cursor
   char buf[32];
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.cx - E.coloff) + 1);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.rx - E.coloff) + 1);
   abAppend(&ab, buf, strlen(buf));
 
   // Show cursor
