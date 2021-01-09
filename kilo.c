@@ -238,7 +238,7 @@ void initEditor()
 
 int cxToRx(erow *row, int cx)
 {
-  int rx = 0;
+  int rx = row->marginlsize;
   int j;
   for (j = 0; j < cx; j++)
   {
