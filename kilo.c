@@ -388,7 +388,8 @@ void editorMoveCursor(int key)
     E.cx = 0;
     break;
   case END_KEY:
-    E.cx = row->size;
+    if (E.cy < E.numrows)
+      E.cx = row->size;
     break;
   }
 
